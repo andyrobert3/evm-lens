@@ -4,6 +4,16 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Colorful EVM bytecode disassembler CLI"
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[[bin]]
+name = "evm-lens"
+path = "src/main.rs"
 
 [dependencies]
 colored.workspace = true
