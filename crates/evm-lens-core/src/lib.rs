@@ -16,7 +16,11 @@ impl std::fmt::Display for DisassemblyError {
             DisassemblyError::InvalidBytecode(msg) => write!(f, "Invalid bytecode: {}", msg),
             DisassemblyError::EmptyBytecode => write!(f, "Bytecode is empty"),
             DisassemblyError::MalformedInstruction { position, byte } => {
-                write!(f, "Malformed instruction at position {}: invalid opcode 0x{:02x}", position, byte)
+                write!(
+                    f,
+                    "Malformed instruction at position {}: invalid opcode 0x{:02x}",
+                    position, byte
+                )
             }
         }
     }
@@ -68,11 +72,13 @@ pub fn disassemble(bytes: &[u8]) -> Result<Vec<(usize, OpCode)>, DisassemblyErro
         result.push((bytecode_iter.position(), opcode));
         bytecode_iter.next();
     }
-    
+
     if result.is_empty() {
-        return Err(DisassemblyError::InvalidBytecode("No valid opcodes found".to_string()));
+        return Err(DisassemblyError::InvalidBytecode(
+            "No valid opcodes found".to_string(),
+        ));
     }
-    
+
     Ok(result)
 }
 
@@ -142,7 +148,7 @@ mod tests {
         let result = disassemble(&bytes);
         assert!(result.is_err());
         match result.unwrap_err() {
-            DisassemblyError::EmptyBytecode => {}, // Expected
+            DisassemblyError::EmptyBytecode => {} // Expected
             _ => panic!("Expected EmptyBytecode error"),
         }
     }

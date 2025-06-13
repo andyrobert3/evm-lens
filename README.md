@@ -1,5 +1,6 @@
 # EVM Lens
 
+[![CI](https://github.com/andyrobert3/evm-lens/workflows/CI/badge.svg)](https://github.com/andyrobert3/evm-lens/actions)
 [![Rust](https://img.shields.io/badge/rust-1.70+-blue.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
