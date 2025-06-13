@@ -97,7 +97,7 @@ EVM BYTECODE DISASSEMBLY
 ### Building
 
 ```bash
-git clone https://github.com/yourusername/evm-lens
+git clone https://github.com/andyrobert3/evm-lens
 cd evm-lens
 cargo build --release
 ```

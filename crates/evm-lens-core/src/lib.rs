@@ -6,15 +6,23 @@ use revm::{
 #[derive(Debug)]
 pub enum DisassemblyError {
     InvalidBytecode(String),
+    EmptyBytecode,
+    MalformedInstruction { position: usize, byte: u8 },
 }
 
 impl std::fmt::Display for DisassemblyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DisassemblyError::InvalidBytecode(msg) => write!(f, "Invalid bytecode: {}", msg),
+            DisassemblyError::EmptyBytecode => write!(f, "Bytecode is empty"),
+            DisassemblyError::MalformedInstruction { position, byte } => {
+                write!(f, "Malformed instruction at position {}: invalid opcode 0x{:02x}", position, byte)
+            }
         }
     }
 }
+
+impl std::error::Error for DisassemblyError {}
 
 /// Disassembles EVM bytecode into a sequence of opcodes with their positions.
 ///
@@ -35,7 +43,7 @@ impl std::fmt::Display for DisassemblyError {
 /// # Example
 ///
 /// ```
-/// use lens_core::disassemble;
+/// use evm_lens_core::disassemble;
 /// use revm::bytecode::OpCode;
 ///
 /// let bytecode = hex::decode("60FF").unwrap(); // PUSH1 0xFF
@@ -44,6 +52,10 @@ impl std::fmt::Display for DisassemblyError {
 /// assert_eq!(ops[0].1, OpCode::PUSH1); // PUSH1 opcode
 /// ```
 pub fn disassemble(bytes: &[u8]) -> Result<Vec<(usize, OpCode)>, DisassemblyError> {
+    if bytes.is_empty() {
+        return Err(DisassemblyError::EmptyBytecode);
+    }
+
     let bytecode = match Bytecode::new_raw_checked(Bytes::from(bytes.to_vec())) {
         Ok(bytecode) => bytecode,
         Err(e) => return Err(DisassemblyError::InvalidBytecode(e.to_string())),
@@ -56,6 +68,11 @@ pub fn disassemble(bytes: &[u8]) -> Result<Vec<(usize, OpCode)>, DisassemblyErro
         result.push((bytecode_iter.position(), opcode));
         bytecode_iter.next();
     }
+    
+    if result.is_empty() {
+        return Err(DisassemblyError::InvalidBytecode("No valid opcodes found".to_string()));
+    }
+    
     Ok(result)
 }
 
@@ -117,5 +134,16 @@ mod tests {
         assert_eq!(ops[4], (7, OpCode::SLOAD)); // SLOAD (load from storage)
         assert_eq!(ops[5], (8, OpCode::KECCAK256)); // KECCAK256 (hash function)
         assert_eq!(ops[6], (9, OpCode::STOP)); // STOP
+    }
+
+    #[test]
+    fn empty_bytecode_error() {
+        let bytes = vec![];
+        let result = disassemble(&bytes);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DisassemblyError::EmptyBytecode => {}, // Expected
+            _ => panic!("Expected EmptyBytecode error"),
+        }
     }
 }
