@@ -1,0 +1,10 @@
+[package]
+name = "evm-lens-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Fast EVM bytecode disassembler library"
+
+[dependencies]
+hex.workspace = true
+revm.workspace = true

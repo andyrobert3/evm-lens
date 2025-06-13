@@ -1,0 +1,22 @@
+[workspace]
+members = ["crates/evm-lens-core", "crates/evm-lens"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/andyrobert3/evm-lens"
+homepage = "https://github.com/andyroebrt3/evm-lens"
+authors = ["Matthew Jacobus <alexandermatthew12@gmail.com>"]
+keywords = ["ethereum", "evm", "bytecode", "disassembler", "blockchain"]
+categories = ["command-line-utilities", "development-tools"]
+
+[workspace.dependencies]
+# Shared dependencies that both crates might use
+hex = "0.4.3"
+revm = { version = "=25.0.0", features = ["std"] }
+clap = { version = "4.0", features = ["derive"] }
+colored = "2.0"
+color-eyre = "0.6"
+
