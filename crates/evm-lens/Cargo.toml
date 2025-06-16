@@ -21,3 +21,18 @@ clap.workspace = true
 color-eyre.workspace = true
 hex.workspace = true
 evm-lens-core = { version = "0.1.0", path = "../evm-lens-core" }
+# I/O module dependencies
+tokio.workspace = true
+serde.workspace = true
+url.workspace = true
+# Minimal JSON-RPC dependencies for Ethereum integration
+reqwest.workspace = true
+serde_json.workspace = true
+ethereum-types.workspace = true
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.0"
+tempfile = "3.8"
+wiremock = "0.6"
+tokio-test = "0.4"
