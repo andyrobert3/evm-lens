@@ -20,8 +20,9 @@ This workspace contains two crates:
 
 ### [`evm-lens`](./evm-lens) - The CLI Tool  
 - Colorful terminal output with opcode categorization
-- Simple command-line interface
+- Multiple input methods: direct hex, files, stdin, and blockchain
 - Support for hex strings with/without `0x` prefix
+- On-chain bytecode fetching via Ethereum RPC
 - Beautiful error reporting
 
 ## 🚀 Quick Start
@@ -36,14 +37,24 @@ cargo install evm-lens
 
 ```toml
 [dependencies]
-evm-lens-core = "0.1.0"
+evm-lens-core = "0.1.1"
 ```
 
 ### Example Usage
 
 **CLI:**
 ```bash
+# From command line argument
 evm-lens 60FF61ABCD00
+
+# From file
+evm-lens --file bytecode.txt
+
+# From stdin
+echo "0x60FF61ABCD00" | evm-lens --stdin
+
+# From contract address (fetches from blockchain)
+evm-lens --address 0x123... --rpc https://eth.llamarpc.com
 ```
 
 **Library:**
@@ -63,7 +74,40 @@ for (position, opcode) in ops {
 - **🎨 Beautiful**: Color-coded output for different opcode categories
 - **✅ Accurate**: Proper handling of PUSH instruction immediates
 - **📍 Precise**: Exact position tracking for all opcodes
+- **🔗 Versatile**: Multiple input sources - hex strings, files, stdin, and blockchain
+- **🌐 Connected**: Fetch live contract bytecode from Ethereum networks
 
+
+## 📥 Input Methods
+
+EVM Lens supports multiple ways to provide bytecode for analysis:
+
+### Direct Hex Input
+```bash
+evm-lens 60FF61ABCD00         # Without 0x prefix
+evm-lens 0x60FF61ABCD00       # With 0x prefix
+```
+
+### File Input
+```bash
+evm-lens --file bytecode.txt  # Read from file
+```
+
+### Standard Input
+```bash
+echo "0x60FF61ABCD00" | evm-lens --stdin
+cat bytecode.txt | evm-lens --stdin
+```
+
+### Blockchain Input
+```bash
+# Use default RPC (eth.llamarpc.com)
+evm-lens --address 0x123...
+
+# Use custom RPC endpoint
+evm-lens --address 0x123... --rpc https://mainnet.infura.io/v3/YOUR_KEY
+evm-lens --address 0x123... --rpc https://eth.llamarpc.com
+```
 
 ## 🎯 Use Cases
 
@@ -72,6 +116,7 @@ for (position, opcode) in ops {
 - **Bytecode Debugging**: Debug Solidity compilation issues
 - **Education**: Learn EVM opcodes and instruction structure
 - **Development Tools**: Build bytecode analysis into your workflow
+- **Live Contract Inspection**: Analyze contracts directly from the blockchain
 
 ## 📊 Example Output
 
@@ -92,7 +137,7 @@ EVM BYTECODE DISASSEMBLY
 
 ### Prerequisites
 
-- Rust 1.70+ (2021 edition)
+- Rust 1.85+ (2024 edition)
 - Cargo
 
 ### Building
@@ -112,8 +157,11 @@ cargo test --workspace
 ### Running Examples
 
 ```bash
-# Run the CLI
+# Run the CLI with different input methods
 cargo run -p evm-lens -- 60FF61ABCD00
+cargo run -p evm-lens -- --file examples/bytecode.txt
+echo "0x60FF61ABCD00" | cargo run -p evm-lens -- --stdin
+cargo run -p evm-lens -- --address 0x... --rpc https://eth.llamarpc.com
 
 # Test the library
 cargo run --example basic -p evm-lens-core
