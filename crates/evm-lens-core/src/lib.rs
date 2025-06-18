@@ -3,6 +3,7 @@ use revm::{
     primitives::Bytes,
 };
 
+
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum DisassemblyError {
     #[error("Invalid bytecode: {0}")]
