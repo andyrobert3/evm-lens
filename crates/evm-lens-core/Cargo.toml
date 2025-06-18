@@ -12,5 +12,6 @@ categories.workspace = true
 readme = "../../README.md"
 
 [dependencies]
+thiserror.workspace = true
 hex.workspace = true
 revm.workspace = true
