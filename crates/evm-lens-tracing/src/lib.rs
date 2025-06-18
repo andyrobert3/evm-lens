@@ -8,30 +8,37 @@ use alloy::{
     network::Ethereum,
     primitives::TxHash,
     providers::{Provider, ProviderBuilder},
+    rpc::types::Transaction,
+    transports::{RpcError, TransportErrorKind},
 };
 
 pub struct Tracer<P: Provider> {
     provider: P,
 }
 
-#[derive(Debug, thiserror::Error, Clone)]
+#[derive(Debug, thiserror::Error)]
 pub enum TracingError {
     #[error("Failed to connect rpc provider : {0}")]
     Connection(String),
-    #[error("Failed to fetch data from provider: {0}")]
-    Io(String),
+    #[error("{0}")]
+    Io(#[from] RpcError<TransportErrorKind>),
+    #[error("Invalid transaction")]
+    Invalid,
 }
 
 pub type TracingResult<T> = Result<T, TracingError>;
-// pub type TxHash = Fix
 
 impl<T: Provider> Tracer<T> {
     pub fn new(provider: T) -> Self {
         Self { provider }
     }
 
-    async fn fetch_tx_data(&self, hash: TxHash) {
-        let tx = self.provider.get_transaction_by_hash(hash).await;
+    async fn fetch_tx_data(&self, hash: TxHash) -> TracingResult<Transaction> {
+        self.provider
+            .get_transaction_by_hash(hash)
+            .await
+            .map_err(|err| TracingError::Io(err))?
+            .ok_or(TracingError::Invalid)
     }
 }
 
