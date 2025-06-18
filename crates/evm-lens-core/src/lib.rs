@@ -6,6 +6,7 @@ use revm::{
 pub mod stats;
 pub use stats::{Stats, StatsError, compute_stats};
 
+
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum DisassemblyError {
     #[error("Invalid bytecode: {0}")]

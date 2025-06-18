@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/evm-lens-core", "crates/evm-lens"]
+members = ["crates/evm-lens-core", "crates/evm-lens", "crates/evm-lens-tracing"]
 resolver = "2"
 
 [workspace.package]
@@ -29,3 +29,4 @@ serde_json = "1.0"
 # Use ethereum-types that's compatible with revm
 ethereum-types = "0.14"
 thiserror = "2.0.12"
+alloy = { version = "1.0.0", features = ["full"] }
