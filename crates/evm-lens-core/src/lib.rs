@@ -3,30 +3,20 @@ use revm::{
     primitives::Bytes,
 };
 
-#[derive(Debug)]
+
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum DisassemblyError {
+    #[error("Invalid bytecode: {0}")]
     InvalidBytecode(String),
+    #[error("Bytecode is empty")]
     EmptyBytecode,
+    #[error(
+        "Malformed instruction at position {}: invalid opcode 0x{:02x}",
+        position,
+        byte
+    )]
     MalformedInstruction { position: usize, byte: u8 },
 }
-
-impl std::fmt::Display for DisassemblyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DisassemblyError::InvalidBytecode(msg) => write!(f, "Invalid bytecode: {}", msg),
-            DisassemblyError::EmptyBytecode => write!(f, "Bytecode is empty"),
-            DisassemblyError::MalformedInstruction { position, byte } => {
-                write!(
-                    f,
-                    "Malformed instruction at position {}: invalid opcode 0x{:02x}",
-                    position, byte
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for DisassemblyError {}
 
 /// Disassembles EVM bytecode into a sequence of opcodes with their positions.
 ///
