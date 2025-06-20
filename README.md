@@ -55,6 +55,9 @@ echo "0x60FF61ABCD00" | evm-lens --stdin
 
 # From contract address (fetches from blockchain)
 evm-lens --address 0x123... --rpc https://eth.llamarpc.com
+
+# Show bytecode statistics
+evm-lens 60FF61ABCD00 --stats
 ```
 
 **Library:**
@@ -70,12 +73,10 @@ for (position, opcode) in ops {
 
 ## 🎨 Features
 
-- **🚀 Fast**: Built on revm's optimized EVM implementation
-- **🎨 Beautiful**: Color-coded output for different opcode categories
-- **✅ Accurate**: Proper handling of PUSH instruction immediates
-- **📍 Precise**: Exact position tracking for all opcodes
-- **🔗 Versatile**: Multiple input sources - hex strings, files, stdin, and blockchain
-- **🌐 Connected**: Fetch live contract bytecode from Ethereum networks
+**Core Capabilities:**
+- **🔍 Disassemble EVM bytecode** from multiple sources - hex strings, files, stdin, and live contract addresses
+- **📊 Generate statistics summary** including bytecode length, number of opcodes, and maximum stack depth
+
 
 
 ## 📥 Input Methods
@@ -109,14 +110,6 @@ evm-lens --address 0x123... --rpc https://mainnet.infura.io/v3/YOUR_KEY
 evm-lens --address 0x123... --rpc https://eth.llamarpc.com
 ```
 
-## 🎯 Use Cases
-
-- **Smart Contract Analysis**: Understand deployed contract behavior
-- **Security Research**: Analyze suspicious or malicious contracts  
-- **Bytecode Debugging**: Debug Solidity compilation issues
-- **Education**: Learn EVM opcodes and instruction structure
-- **Development Tools**: Build bytecode analysis into your workflow
-- **Live Contract Inspection**: Analyze contracts directly from the blockchain
 
 ## 📊 Example Output
 
@@ -130,6 +123,22 @@ EVM BYTECODE DISASSEMBLY
 0007 │ RETURN    # Termination (white)
 ==================================================
 5 opcodes total
+```
+
+**With `--stats` flag:**
+```
+EVM BYTECODE DISASSEMBLY
+==================================================
+0000 │ PUSH1
+0002 │ PUSH2
+0005 │ STOP
+==================================================
+3 opcodes total
+BYTECODE STATISTICS
+==================================================
+Byte length: 6
+Number of opcodes: 3
+Max stack depth: 2
 ```
 
 
@@ -161,7 +170,7 @@ cargo test --workspace
 cargo run -p evm-lens -- 60FF61ABCD00
 cargo run -p evm-lens -- --file examples/bytecode.txt
 echo "0x60FF61ABCD00" | cargo run -p evm-lens -- --stdin
-cargo run -p evm-lens -- --address 0x... --rpc https://eth.llamarpc.com
+cargo run -p evm-lens -- --address 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 --rpc https://eth.llamarpc.com
 
 # Test the library
 cargo run --example basic -p evm-lens-core

@@ -3,6 +3,9 @@ use revm::{
     primitives::Bytes,
 };
 
+pub mod stats;
+pub use stats::{Stats, StatsError, compute_stats};
+
 #[derive(Debug)]
 pub enum DisassemblyError {
     InvalidBytecode(String),
@@ -82,6 +85,47 @@ pub fn disassemble(bytes: &[u8]) -> Result<Vec<(usize, OpCode)>, DisassemblyErro
     Ok(result)
 }
 
+/// Computes and returns statistics for the given bytecode.
+///
+/// This function takes raw bytecode bytes and returns comprehensive statistics
+/// including byte length, opcode count, maximum stack depth, and other metrics.
+///
+/// # Arguments
+///
+/// * `bytes` - A slice of bytes containing the raw EVM bytecode
+///
+/// # Returns
+///
+/// * `Ok(Stats)` - Statistics about the bytecode
+/// * `Err(DisassemblyError)` - If the bytecode is invalid
+///
+/// # Example
+///
+/// ```
+/// use evm_lens_core::get_stats;
+///
+/// let bytecode = hex::decode("60FF600101").unwrap(); // PUSH1 0xFF, PUSH1 0x01, ADD
+/// let stats = get_stats(&bytecode).unwrap();
+/// println!("Bytecode length: {} bytes", stats.byte_len);
+/// println!("Number of opcodes: {}", stats.opcode_count);
+/// ```
+pub fn get_stats(bytes: &[u8]) -> Result<Stats, DisassemblyError> {
+    if bytes.is_empty() {
+        return Err(DisassemblyError::EmptyBytecode);
+    }
+
+    let bytecode = match Bytecode::new_raw_checked(Bytes::from(bytes.to_vec())) {
+        Ok(bytecode) => bytecode,
+        Err(e) => return Err(DisassemblyError::InvalidBytecode(e.to_string())),
+    };
+
+    compute_stats(&bytecode).map_err(|e| match e {
+        StatsError::UnknownOpcode(opcode) => DisassemblyError::MalformedInstruction {
+            position: 0, // We don't have position info from stats error
+            byte: opcode,
+        },
+    })
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +190,28 @@ mod tests {
     fn empty_bytecode_error() {
         let bytes = vec![];
         let result = disassemble(&bytes);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DisassemblyError::EmptyBytecode => {} // Expected
+            _ => panic!("Expected EmptyBytecode error"),
+        }
+    }
+
+    #[test]
+    fn test_get_stats() {
+        // PUSH1 0xFF, PUSH1 0x01, ADD, STOP
+        let bytes = hex::decode("60FF60010100").unwrap();
+        let stats = get_stats(&bytes).unwrap();
+
+        assert_eq!(stats.byte_len, 6);
+        assert_eq!(stats.opcode_count, 4);
+        assert!(stats.max_stack_depth > 0);
+    }
+
+    #[test]
+    fn test_stats_with_empty_bytecode() {
+        let bytes = vec![];
+        let result = get_stats(&bytes);
         assert!(result.is_err());
         match result.unwrap_err() {
             DisassemblyError::EmptyBytecode => {} // Expected
