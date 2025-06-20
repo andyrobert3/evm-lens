@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::*;
-use evm_lens_core::disassemble;
+use evm_lens_core::{disassemble, get_stats, Stats};
 use io::Source;
 
 mod io;
@@ -15,6 +15,7 @@ mod io;
     echo '0x60FF61ABCD00' | evm-lens --stdin   # From stdin
     evm-lens --file bytecode.txt               # From file
     evm-lens --address 0x... --rpc http://...  # From blockchain
+    evm-lens 60FF61ABCD00 --stats              # Show disassembly + statistics
 
 For more information, visit: https://github.com/andyrobert3/evm-lens"
 )]
@@ -56,6 +57,12 @@ struct Args {
         default_value = "https://eth.llamarpc.com"
     )]
     rpc: Option<String>,
+
+    #[arg(
+        long,
+        help = "Show bytecode statistics after disassembly"
+    )]
+    stats: bool,
 }
 
 fn categorize_opcode(opcode_str: &str) -> ColoredString {
@@ -134,6 +141,7 @@ fn print_usage_hint() {
         "  {} --address 0x123... --rpc https://eth.llamarpc.com",
         "evm-lens".bright_green()
     );
+    eprintln!("  {} 60FF61ABCD00 --stats", "evm-lens".bright_green());
     eprintln!();
     eprintln!(
         "{}",
@@ -215,6 +223,22 @@ async fn main() -> color_eyre::Result<()> {
     }
 
     print_footer(ops.len());
+
+    if args.stats {
+        println!();
+        match get_stats(&bytes) {
+            Ok(Stats { byte_len, opcode_count, max_stack_depth }) => {
+                println!("{}", "BYTECODE STATISTICS".bright_blue().bold());
+                println!("{}", "=".repeat(50).bright_black());
+                println!("Byte length: {}", byte_len);
+                println!("Number of opcodes: {}", opcode_count);
+                println!("Max stack depth: {}", max_stack_depth);
+            }
+            Err(e) => {
+                print_error(&format!("Failed to compute bytecode statistics: {}", e));
+            }
+        }
+    }
 
     Ok(())
 }
