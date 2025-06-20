@@ -1,18 +1,15 @@
 [package]
-name = "evm-lens-core"
+name = "evm-lens-tracing"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Fast EVM bytecode disassembler library"
 repository.workspace = true
 homepage.workspace = true
 authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
-readme = "../../README.md"
 
 [dependencies]
 thiserror.workspace = true
-hex.workspace = true
 revm.workspace = true
 alloy.workspace = true
