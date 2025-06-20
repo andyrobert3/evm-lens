@@ -200,9 +200,9 @@ mod tests {
     #[test]
     fn test_get_stats() {
         // PUSH1 0xFF, PUSH1 0x01, ADD, STOP
-        let bytes = hex::decode("60FF60010100").unwrap(); 
+        let bytes = hex::decode("60FF60010100").unwrap();
         let stats = get_stats(&bytes).unwrap();
-        
+
         assert_eq!(stats.byte_len, 6);
         assert_eq!(stats.opcode_count, 4);
         assert!(stats.max_stack_depth > 0);

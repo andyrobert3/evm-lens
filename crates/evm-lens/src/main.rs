@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::*;
-use evm_lens_core::{disassemble, get_stats, Stats};
+use evm_lens_core::{Stats, disassemble, get_stats};
 use io::Source;
 
 mod io;
@@ -58,10 +58,7 @@ struct Args {
     )]
     rpc: Option<String>,
 
-    #[arg(
-        long,
-        help = "Show bytecode statistics after disassembly"
-    )]
+    #[arg(long, help = "Show bytecode statistics after disassembly")]
     stats: bool,
 }
 
@@ -227,7 +224,11 @@ async fn main() -> color_eyre::Result<()> {
     if args.stats {
         println!();
         match get_stats(&bytes) {
-            Ok(Stats { byte_len, opcode_count, max_stack_depth }) => {
+            Ok(Stats {
+                byte_len,
+                opcode_count,
+                max_stack_depth,
+            }) => {
                 println!("{}", "BYTECODE STATISTICS".bright_blue().bold());
                 println!("{}", "=".repeat(50).bright_black());
                 println!("Byte length: {}", byte_len);
