@@ -1234,7 +1234,7 @@ dependencies = [
 
 [[package]]
 name = "evm-lens"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -1256,7 +1256,7 @@ dependencies = [
 
 [[package]]
 name = "evm-lens-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "hex",
  "revm",
