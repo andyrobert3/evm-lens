@@ -73,7 +73,7 @@ impl TryFrom<&[u8]> for TraceKind {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let b = value.to_owned();
-        let a= serde_json::from_slice::<Output>(&b) ;
+        let a = serde_json::from_slice::<Output>(&b);
         if let Ok(output) = serde_json::from_slice::<Output>(value) {
             return Ok(Self::Output(output));
         } else {

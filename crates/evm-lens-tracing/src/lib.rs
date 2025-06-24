@@ -20,48 +20,44 @@ use alloy::{
     transports::{RpcError, TransportErrorKind},
 };
 use revm::{
-    database::{AlloyDB, CacheDB, StateBuilder}, database_interface::WrapDatabaseAsync, inspector::inspectors::TracerEip3155, primitives::U256, Context, MainBuilder, MainContext
+    Context, MainBuilder, MainContext,
+    database::{AlloyDB, CacheDB, StateBuilder},
+    database_interface::WrapDatabaseAsync,
+    inspector::inspectors::TracerEip3155,
+    primitives::U256,
 };
 
 use crate::sort::SortMarker;
 
 pub mod item;
 
-
 pub mod sort {
 
     pub struct Sorted;
     pub struct Unsorted;
-    
+
     pub trait SortMarker {}
-    impl SortMarker for Sorted{}
-    impl SortMarker for Unsorted{}
-    
+    impl SortMarker for Sorted {}
+    impl SortMarker for Unsorted {}
 }
 
 /// used to collect traces from inspector
 #[derive(Clone)]
-pub struct Traces<S: sort::SortMarker>{
-    buff : Vec<>
+pub struct Traces<S: sort::SortMarker> {
+    buff: Vec,
 }
 
 pub enum TraceKind {
-Summary()
+    Summary(),
 }
 
-
-impl<S:SortMarker> Write for Traces<S> {
+impl<S: SortMarker> Write for Traces<S> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         // handles new line being written by the tracer
         // we don't actually need the new line since we're writing to memory
         if buf.len() == 1 {
-            return Ok(1)
+            return Ok(1);
         }
-
-
-
-
-        
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -150,8 +146,7 @@ where
                 c.chain_id = chain_id;
             });
 
-            
-                let mut evm = ctx.build_mainnet_with_inspector(TracerEip3155::new(Box::new(writer)));
+        let mut evm = ctx.build_mainnet_with_inspector(TracerEip3155::new(Box::new(writer)));
 
         let BlockTransactions::Full(transactions) = block.transactions else {
             return Err(TracingError::Invalid);
