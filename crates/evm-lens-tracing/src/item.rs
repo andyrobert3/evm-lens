@@ -2,7 +2,6 @@
 
 use revm::primitives::{HashMap, U256};
 use serde::Deserialize;
-use serde_json::Value;
 
 use crate::sort::SortMarker;
 
@@ -85,9 +84,9 @@ impl TryFrom<&[u8]> for TraceKind {
 
 
         if let Ok(output) = serde_json::from_slice::<Output>(value) {
-            return Ok(Self::Output(output));
+            Ok(Self::Output(output))
         } else {
-            return Ok(Self::Summary(serde_json::from_slice::<Summary>(value)?));
+            Ok(Self::Summary(serde_json::from_slice::<Summary>(value)?))
         }
     }
 }

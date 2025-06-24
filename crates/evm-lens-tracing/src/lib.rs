@@ -8,24 +8,27 @@
 // collect and segregate traces to it's individual calls
 // display stuff
 
-use std::{fmt::Debug, io::Write};
+use std::{
+    fmt::Debug,
+    io::Write,
+    sync::{Arc, Mutex},
+};
 
 use alloy::{
     consensus::Transaction,
     eips::{BlockId, BlockNumberOrTag},
-    network::Ethereum,
     primitives::TxHash,
     providers::{Provider, ProviderBuilder},
     rpc::types::{Block, BlockTransactions, Transaction as RpcTransaction},
     transports::{RpcError, TransportErrorKind},
 };
 use revm::{
-    Context, MainBuilder, MainContext,
+    Context, ExecuteCommitEvm, InspectEvm, MainBuilder, MainContext,
     context::TxEnv,
     database::{AlloyDB, CacheDB, StateBuilder},
     database_interface::WrapDatabaseAsync,
     inspector::inspectors::TracerEip3155,
-    primitives::{TxKind, U256},
+    primitives::TxKind,
 };
 
 use crate::sort::SortMarker;
@@ -39,23 +42,53 @@ pub mod sort {
 }
 
 /// used to collect traces from inspector
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct Traces<S: sort::SortMarker> {
-    buff: Vec<S>,
+    // TODO : change this to just S
+    buff: Arc<Mutex<Vec<S>>>,
+}
+
+impl<S: sort::SortMarker> Traces<S> {
+    pub fn into_inner(self) -> Vec<S> {
+        let buff = Arc::into_inner(self.buff).unwrap();
+        buff.into_inner().unwrap()
+    }
+}
+
+impl<S: Clone + SortMarker> Clone for Traces<S> {
+    fn clone(&self) -> Self {
+        Traces {
+            buff: self.buff.clone(),
+        }
+    }
+}
+
+impl<S: SortMarker> SortMarker for Traces<S> {
+    fn sort(&mut self) {
+        todo!()
+    }
+}
+
+impl<S: sort::SortMarker> Default for Traces<S> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<S: sort::SortMarker> Traces<S> {
     pub fn new() -> Self {
-        Self { buff: vec![] }
+        Self {
+            buff: Default::default(),
+        }
     }
 }
 
+/// as long as you implement [SortMarker] and [TryFrom<&[u8]>] you're good
 impl<S> Write for Traces<S>
 where
-S: Debug + SortMarker + for<'a> TryFrom<&'a [u8]>,
-for<'a> <S as TryFrom<&'a [u8]>>::Error: Debug,
+    S: Debug + SortMarker + for<'a> TryFrom<&'a [u8]>,
+    for<'a> <S as TryFrom<&'a [u8]>>::Error: Debug,
 {
-    /// as long as you implement [SortMarker] and [TryFrom<&[u8]>] you're good
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         // handles new line being written by the tracer
         // we don't actually need the new line since we're writing to memory
@@ -65,14 +98,18 @@ for<'a> <S as TryFrom<&'a [u8]>>::Error: Debug,
 
         let trace = S::try_from(buf).expect("internal serialization must succeed");
 
-        self.buff.push(trace);
+        let mut buff = self
+            .buff
+            .lock()
+            .expect("no other thread should hold the lock");
+
+        buff.push(trace);
 
         Ok(buf.len())
     }
 
     /// we dont write stuff onto disk so this'll be a noop
     fn flush(&mut self) -> std::io::Result<()> {
-        
         Ok(())
     }
 }
@@ -111,7 +148,7 @@ where
         self.provider
             .get_transaction_by_hash(hash)
             .await
-            .map_err(|err| TracingError::Io(err))?
+            .map_err(TracingError::Io)?
             .ok_or(TracingError::Invalid)
     }
 
@@ -120,13 +157,13 @@ where
             .get_block_by_number(block)
             .full()
             .await
-            .map_err(|err| TracingError::Io(err))?
+            .map_err(TracingError::Io)?
             .ok_or(TracingError::Invalid)
     }
 
     pub async fn trace(&self, hash: TxHash) -> TracingResult<()> {
         let chain_id = self.provider.get_chain_id().await?;
-        let tx = self.fetch_tx_data(hash).await?;
+        let tx = self.fetch_tx_data(hash.to_owned()).await?;
 
         let Some(block) = &tx.block_number else {
             return Err(TracingError::Other(String::from(
@@ -137,9 +174,9 @@ where
         let block = self.fetch_block_full(block_ident).await?;
 
         let state_db = AlloyDB::new(self.provider.clone(), BlockId::Number(block_ident));
-        let state_db = WrapDatabaseAsync::new(state_db).ok_or(TracingError::Other(format!(
-            "for some reason no tokio rt is found :("
-        )))?;
+        let state_db = WrapDatabaseAsync::new(state_db).ok_or(TracingError::Other(
+            "for some reason no tokio rt is found :(".to_string(),
+        ))?;
         let state_db = CacheDB::new(state_db);
         let mut state = StateBuilder::new_with_database(state_db).build();
 
@@ -158,9 +195,10 @@ where
                 c.chain_id = chain_id;
             });
 
-        let writer = Traces::<item::TraceKind>::new();
+        // fokin ugly
+        let buff_writer = Box::new(Traces::<item::TraceKind>::new());
 
-        let mut evm = ctx.build_mainnet_with_inspector(TracerEip3155::new(Box::new(writer)));
+        let mut evm = ctx.build_mainnet_with_inspector(TracerEip3155::new(buff_writer.clone()));
 
         let BlockTransactions::Full(transactions) = block.transactions else {
             return Err(TracingError::Invalid);
@@ -170,7 +208,7 @@ where
             // Construct the file writer to write the trace to
             let tx_number = tx.transaction_index.unwrap_or_default();
 
-            let tx = TxEnv {
+            let reconstructed_tx = TxEnv {
                 caller: tx.inner.signer(),
                 gas_limit: tx.gas_limit(),
                 gas_price: tx.gas_price().unwrap_or(tx.inner.max_fee_per_gas()),
@@ -186,12 +224,21 @@ where
                 },
                 ..Default::default()
             };
+
+            // inspect the tx if it's the same hash
+            if tx.info().hash.unwrap() == hash {
+                let _ = evm.inspect_with_tx(reconstructed_tx);
+                break;
+            } else {
+                let _ = evm.transact_commit(reconstructed_tx);
+            }
         }
+
+        // we need to explicitly drop evm here so that the traces doesn't have any reference associated into it
+        drop(evm);
 
         todo!()
     }
-
-    async fn inspect() {}
 }
 
 pub async fn create_provider(url: &str) -> TracingResult<impl Provider> {
