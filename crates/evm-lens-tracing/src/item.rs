@@ -4,6 +4,8 @@ use revm::primitives::{HashMap, U256};
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::sort::SortMarker;
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Summary {
     // Required fields:
@@ -43,7 +45,7 @@ pub struct Output {
     /// Depth of the EOF function call stack
     function_depth: Option<u64>,
     /// Data returned by the function call
-    return_data: &'static str,
+    return_data: String,
     /// Amount of **global** gas refunded
     refund: u64,
     /// Size of memory array
@@ -68,12 +70,20 @@ pub enum TraceKind {
     Summary(Summary),
 }
 
+impl SortMarker for TraceKind {
+    fn sort(&mut self) {
+        todo!()
+    }
+}
+
 impl TryFrom<&[u8]> for TraceKind {
     type Error = serde_json::error::Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let b = value.to_owned();
         let a = serde_json::from_slice::<Output>(&b);
+
+
         if let Ok(output) = serde_json::from_slice::<Output>(value) {
             return Ok(Self::Output(output));
         } else {

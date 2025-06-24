@@ -8,7 +8,7 @@
 // collect and segregate traces to it's individual calls
 // display stuff
 
-use std::io::Write;
+use std::{fmt::Debug, io::Write};
 
 use alloy::{
     consensus::Transaction,
@@ -16,15 +16,16 @@ use alloy::{
     network::Ethereum,
     primitives::TxHash,
     providers::{Provider, ProviderBuilder},
-    rpc::types::{Block, BlockTransactions, Transaction},
+    rpc::types::{Block, BlockTransactions, Transaction as RpcTransaction},
     transports::{RpcError, TransportErrorKind},
 };
 use revm::{
     Context, MainBuilder, MainContext,
+    context::TxEnv,
     database::{AlloyDB, CacheDB, StateBuilder},
     database_interface::WrapDatabaseAsync,
     inspector::inspectors::TracerEip3155,
-    primitives::U256,
+    primitives::{TxKind, U256},
 };
 
 use crate::sort::SortMarker;
@@ -32,36 +33,47 @@ use crate::sort::SortMarker;
 pub mod item;
 
 pub mod sort {
-
-    pub struct Sorted;
-    pub struct Unsorted;
-
-    pub trait SortMarker {}
-    impl SortMarker for Sorted {}
-    impl SortMarker for Unsorted {}
+    pub trait SortMarker {
+        fn sort(&mut self);
+    }
 }
 
 /// used to collect traces from inspector
 #[derive(Clone)]
 pub struct Traces<S: sort::SortMarker> {
-    buff: Vec,
+    buff: Vec<S>,
 }
 
-pub enum TraceKind {
-    Summary(),
+impl<S: sort::SortMarker> Traces<S> {
+    pub fn new() -> Self {
+        Self { buff: vec![] }
+    }
 }
 
-impl<S: SortMarker> Write for Traces<S> {
+impl<S> Write for Traces<S>
+where
+S: Debug + SortMarker + for<'a> TryFrom<&'a [u8]>,
+for<'a> <S as TryFrom<&'a [u8]>>::Error: Debug,
+{
+    /// as long as you implement [SortMarker] and [TryFrom<&[u8]>] you're good
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         // handles new line being written by the tracer
         // we don't actually need the new line since we're writing to memory
         if buf.len() == 1 {
             return Ok(1);
         }
+
+        let trace = S::try_from(buf).expect("internal serialization must succeed");
+
+        self.buff.push(trace);
+
+        Ok(buf.len())
     }
 
+    /// we dont write stuff onto disk so this'll be a noop
     fn flush(&mut self) -> std::io::Result<()> {
-        todo!()
+        
+        Ok(())
     }
 }
 
@@ -95,7 +107,7 @@ where
         Self { provider }
     }
 
-    async fn fetch_tx_data(&self, hash: TxHash) -> TracingResult<Transaction> {
+    async fn fetch_tx_data(&self, hash: TxHash) -> TracingResult<RpcTransaction> {
         self.provider
             .get_transaction_by_hash(hash)
             .await
@@ -145,6 +157,8 @@ where
             .modify_cfg_chained(|c| {
                 c.chain_id = chain_id;
             });
+
+        let writer = Traces::<item::TraceKind>::new();
 
         let mut evm = ctx.build_mainnet_with_inspector(TracerEip3155::new(Box::new(writer)));
 
