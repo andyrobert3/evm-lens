@@ -28,4 +28,13 @@ reqwest = { version = "0.11", features = ["json"] }
 serde_json = "1.0"
 # Use ethereum-types that's compatible with revm
 ethereum-types = "0.14"
+# LRU cache
+lru = "0.14.0"
+
+# ABI module dependencies
+async-trait = "0.1.88"
+thiserror = "2.0.12"
+log = "0.4.27"
+mockito = "1.7.0"
+tempfile = "3.20.0"
 

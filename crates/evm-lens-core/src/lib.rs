@@ -5,6 +5,7 @@ use revm::{
 
 pub mod stats;
 pub use stats::{Stats, StatsError, compute_stats};
+pub mod abi;
 
 #[derive(Debug)]
 pub enum DisassemblyError {
