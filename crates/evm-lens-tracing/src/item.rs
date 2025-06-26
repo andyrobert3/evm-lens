@@ -27,7 +27,7 @@ pub struct Summary {
     fork: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct Output {
     // Required fields:
     /// Program counter
@@ -66,7 +66,7 @@ pub struct Output {
     return_stack: Option<Vec<String>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OrderedTrace(Vec<Output>);
 
 impl OrderedTrace {
@@ -88,6 +88,11 @@ impl OrderedTrace {
             } else {
                 tmp.push(raw_trace);
             }
+        }
+
+        // push last tmp if any
+        if !tmp.is_empty() {
+            out_buff.push(OrderedTrace(tmp));
         }
 
         out_buff
@@ -119,5 +124,52 @@ impl TryFrom<&[u8]> for TraceKind {
         } else {
             Ok(Self::Summary(serde_json::from_slice::<Summary>(value)?))
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn dummy_trace(op: OpCode) -> Output {
+        let mut out: Output = Default::default();
+
+        out.op = op.as_usize() as u8;
+
+        out
+    }
+
+    #[test]
+    fn test_sort() {
+        let unordered_shit: Vec<Output> = vec![
+            dummy_trace(OpCode::CALL),
+            dummy_trace(OpCode::DATASIZE),
+            dummy_trace(OpCode::SSTORE),
+            dummy_trace(OpCode::DELEGATECALL),
+            dummy_trace(OpCode::SLOAD),
+            dummy_trace(OpCode::RETURN),
+        ];
+
+        let ordered = OrderedTrace::sort(unordered_shit);
+
+        println!("{:#?}", ordered);
+
+        assert_eq!(ordered.len(), 2);
+        assert_eq!(
+            ordered[0],
+            OrderedTrace(vec![
+                dummy_trace(OpCode::CALL),
+                dummy_trace(OpCode::DATASIZE),
+                dummy_trace(OpCode::SSTORE),
+            ])
+        );
+        assert_eq!(
+            ordered[1],
+            OrderedTrace(vec![
+                dummy_trace(OpCode::DELEGATECALL),
+                dummy_trace(OpCode::SLOAD),
+                dummy_trace(OpCode::RETURN),
+            ])
+        );
     }
 }

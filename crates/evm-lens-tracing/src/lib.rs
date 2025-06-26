@@ -181,7 +181,7 @@ where
             .ok_or(TracingError::Invalid)
     }
 
-    pub async fn trace(&self, hash: TxHash) -> TracingResult<()> {
+    pub async fn trace(&self, hash: TxHash) -> TracingResult<Vec<TraceKind>> {
         let chain_id = self.provider.get_chain_id().await?;
         let tx = self.fetch_tx_data(hash.to_owned()).await?;
 
@@ -216,7 +216,7 @@ where
             });
 
         // fokin ugly
-        let buff_writer = Box::new(Traces::<item::TraceKind>::new());
+        let mut buff_writer = Box::new(Traces::<item::TraceKind>::new());
 
         let mut evm = ctx.build_mainnet_with_inspector(TracerEip3155::new(buff_writer.clone()));
 
@@ -225,9 +225,6 @@ where
         };
 
         for tx in transactions {
-            // Construct the file writer to write the trace to
-            let tx_number = tx.transaction_index.unwrap_or_default();
-
             let reconstructed_tx = TxEnv {
                 caller: tx.inner.signer(),
                 gas_limit: tx.gas_limit(),
@@ -257,9 +254,11 @@ where
         // we need to explicitly drop evm here so that the traces doesn't have any reference associated into it
         drop(evm);
 
-        let traces = buff_writer;
+        let mut traces = buff_writer;
+        SortMarker::sort(&mut *traces);
+        let traces = traces.into_inner();
 
-        todo!()
+        Ok(traces)
     }
 }
 
