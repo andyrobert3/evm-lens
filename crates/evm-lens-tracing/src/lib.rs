@@ -1,12 +1,3 @@
-// fetch tx data
-// fetch block
-// run all tx until before the target tx
-// use that as the db state
-// wrap tracer inspector
-// run inside revm
-// output tracing info
-// collect and segregate traces to it's individual calls
-// display stuff
 
 use std::{
     fmt::Debug,
