@@ -31,7 +31,10 @@ use revm::{
     primitives::TxKind,
 };
 
-use crate::sort::SortMarker;
+use crate::{
+    item::{OrderedTrace, TraceKind},
+    sort::SortMarker,
+};
 
 pub mod item;
 
@@ -44,7 +47,6 @@ pub mod sort {
 /// used to collect traces from inspector
 #[derive(Debug)]
 pub struct Traces<S: sort::SortMarker> {
-    // TODO : change this to just S
     buff: Arc<Mutex<Vec<S>>>,
 }
 
@@ -63,9 +65,27 @@ impl<S: Clone + SortMarker> Clone for Traces<S> {
     }
 }
 
-impl<S: SortMarker> SortMarker for Traces<S> {
+impl SortMarker for Traces<TraceKind> {
     fn sort(&mut self) {
-        todo!()
+        let mut inner = self.buff.lock().unwrap();
+
+        let mut tmp = vec![];
+
+        for unordered_trace in inner.iter() {
+            let TraceKind::Output(trace) = unordered_trace.to_owned() else {
+                continue;
+            };
+
+            tmp.push(trace);
+        }
+
+        let ordered = OrderedTrace::sort(tmp);
+        let buff = ordered
+            .into_iter()
+            .map(TraceKind::Ordered)
+            .collect::<Vec<_>>();
+
+        *inner = buff
     }
 }
 
@@ -236,6 +256,8 @@ where
 
         // we need to explicitly drop evm here so that the traces doesn't have any reference associated into it
         drop(evm);
+
+        let traces = buff_writer;
 
         todo!()
     }

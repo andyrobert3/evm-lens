@@ -1,6 +1,9 @@
 // re implementation of trace items in eip3155 bcs it doesn't export them ffs
 
-use revm::primitives::{HashMap, U256};
+use revm::{
+    bytecode::OpCode,
+    primitives::{HashMap, U256},
+};
 use serde::Deserialize;
 
 use crate::sort::SortMarker;
@@ -24,7 +27,7 @@ pub struct Summary {
     fork: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct Output {
     // Required fields:
     /// Program counter
@@ -63,10 +66,39 @@ pub struct Output {
     return_stack: Option<Vec<String>>,
 }
 
+#[derive(Clone, Debug)]
+pub struct OrderedTrace(Vec<Output>);
+
+impl OrderedTrace {
+    pub fn sort(raw: Vec<Output>) -> Vec<Self> {
+        let mut out_buff = vec![];
+        let mut tmp = vec![];
+
+        for raw_trace in raw {
+            let op = OpCode::new(raw_trace.op).expect("unknown opcode encountered");
+
+            if op == OpCode::CALL || op == OpCode::DELEGATECALL {
+                if !tmp.is_empty() {
+                    out_buff.push(OrderedTrace(tmp));
+                }
+
+                tmp = vec![];
+
+                tmp.push(raw_trace);
+            } else {
+                tmp.push(raw_trace);
+            }
+        }
+
+        out_buff
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum TraceKind {
     Output(Output),
     Summary(Summary),
+    Ordered(OrderedTrace),
 }
 
 impl SortMarker for TraceKind {
