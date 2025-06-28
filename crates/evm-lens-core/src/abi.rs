@@ -1,22 +1,12 @@
-use std::{
-  collections::HashMap,
-  num::NonZeroUsize,
-  path::PathBuf,
-  sync::Arc,
-  time::Duration,
-};
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::sleep;
 
 use async_trait::async_trait;
+use log::error;
 use lru::LruCache;
 use reqwest::{Client, Error as ReqwestError};
 use serde::Deserialize;
-use tokio::{
-  fs,
-  sync::RwLock,
-  task,
-};
-use log::error;
+use tokio::{fs, sync::RwLock, task};
 
 /// Maximum number of selectors kept in the in‑memory LRU.
 const DEFAULT_CACHE_SIZE: usize = 5_000;
@@ -27,28 +17,28 @@ pub type Selector = [u8; 4];
 /// Information about one human‑readable function signature.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SigInfo {
-  /// e.g. "transfer(address,uint256)"
-  pub text: String,
-  pub selector: Selector,
+    /// e.g. "transfer(address,uint256)"
+    pub text: String,
+    pub selector: Selector,
 }
 
 /// Errors that can occur during resolution.
 #[derive(thiserror::Error, Debug)]
 pub enum ResolveError {
-  #[error("network error")]
-  Network(#[from] ReqwestError),
-  #[error("io error")]
-  Io(#[from] std::io::Error),
-  #[error("json error")]
-  Json(#[from] serde_json::Error),
-  #[error("task join error")]
-  Join(#[from] task::JoinError),
+    #[error("network error")]
+    Network(#[from] ReqwestError),
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+    #[error("json error")]
+    Json(#[from] serde_json::Error),
+    #[error("task join error")]
+    Join(#[from] task::JoinError),
 }
 
 /// Async interface for mapping a 4‑byte selector → signatures.
 #[async_trait]
 pub trait SelectorResolver: Send + Sync {
-  async fn resolve(&self, selector: Selector) -> Result<Arc<[SigInfo]>, ResolveError>;
+    async fn resolve(&self, selector: Selector) -> Result<Arc<[SigInfo]>, ResolveError>;
 }
 
 /// “Do‑nothing” implementation, returns an empty slice.
@@ -56,158 +46,160 @@ pub struct NullResolver;
 
 #[async_trait]
 impl SelectorResolver for NullResolver {
-  async fn resolve(&self, _selector: Selector) -> Result<Arc<[SigInfo]>, ResolveError> {
-      Ok(Arc::from([]))
-  }
+    async fn resolve(&self, _selector: Selector) -> Result<Arc<[SigInfo]>, ResolveError> {
+        Ok(Arc::from([]))
+    }
 }
 
 /// LRU‑cached + on‑disk‑persisted resolver that falls back to 4byte.directory.
 #[derive(Clone)]
 pub struct CompositeResolver {
-  cache: Arc<RwLock<LruCache<Selector, Arc<[SigInfo]>>>>,
-  cache_file: PathBuf,
-  client: Client,
-  base_url: String,
+    cache: Arc<RwLock<LruCache<Selector, Arc<[SigInfo]>>>>,
+    cache_file: PathBuf,
+    client: Client,
+    base_url: String,
 }
 
 #[derive(Deserialize)]
 struct FourByteEntry {
-  text_signature: String,
+    text_signature: String,
 }
 
 #[derive(Deserialize)]
 struct FourByteResponse {
-  #[serde(rename = "results")]
-  results: Vec<FourByteEntry>,
+    #[serde(rename = "results")]
+    results: Vec<FourByteEntry>,
 }
 
 impl CompositeResolver {
-  /// Creates a new resolver. Will eagerly load the on‑disk JSON cache if present.
-  pub async fn new(cache_file: PathBuf, base_url: Option<String>) -> Self {
-      let map: HashMap<String, Vec<String>> = fs::read_to_string(&cache_file)
-          .await
-          .ok()
-          .and_then(|s| serde_json::from_str(&s).ok())
-          .unwrap_or_default();
+    /// Creates a new resolver. Will eagerly load the on‑disk JSON cache if present.
+    pub async fn new(cache_file: PathBuf, base_url: Option<String>) -> Self {
+        let map: HashMap<String, Vec<String>> = fs::read_to_string(&cache_file)
+            .await
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
 
-      let mut lru = LruCache::new(NonZeroUsize::new(DEFAULT_CACHE_SIZE).expect("non‑zero"));
-      for (hex_sel, sigs) in map {
-          if let Ok(bytes) = hex::decode(hex_sel) {
-              if bytes.len() == 4 {
-                  let mut arr = [0u8; 4];
-                  arr.copy_from_slice(&bytes);
-                  let arc = Arc::from(
-                      sigs
-                          .into_iter()
-                          .map(|text| SigInfo { text, selector: arr })
-                          .collect::<Vec<_>>(),
-                  );
-                  lru.put(arr, arc);
-              }
-          }
-      }
+        let mut lru = LruCache::new(NonZeroUsize::new(DEFAULT_CACHE_SIZE).expect("non‑zero"));
+        for (hex_sel, sigs) in map {
+            if let Ok(bytes) = hex::decode(hex_sel) {
+                if bytes.len() == 4 {
+                    let mut arr = [0u8; 4];
+                    arr.copy_from_slice(&bytes);
+                    let arc = Arc::from(
+                        sigs.into_iter()
+                            .map(|text| SigInfo {
+                                text,
+                                selector: arr,
+                            })
+                            .collect::<Vec<_>>(),
+                    );
+                    lru.put(arr, arc);
+                }
+            }
+        }
 
-      Self {
-          cache: Arc::new(RwLock::new(lru)),
-          cache_file,
-          client: Client::builder()
-              .user_agent("evm-lens (+https://github.com/andyrobert3/evm-lens)")
-              .build()
-              .expect("reqwest client"),
-          base_url: base_url.unwrap_or_else(|| "https://www.4byte.directory".to_string()),
-      }
-  }
+        Self {
+            cache: Arc::new(RwLock::new(lru)),
+            cache_file,
+            client: Client::builder()
+                .user_agent("evm-lens (+https://github.com/andyrobert3/evm-lens)")
+                .build()
+                .expect("reqwest client"),
+            base_url: base_url.unwrap_or_else(|| "https://www.4byte.directory".to_string()),
+        }
+    }
 
-  /// Write the current cache map back to disk (atomic rename).
-  async fn persist(&self) -> Result<(), ResolveError> {
-      // Snapshot the cache with a read‑lock then serialize outside the lock.
-      let snapshot: HashMap<String, Vec<String>> = {
-          let cache = self.cache.read().await;
-          cache
-              .iter()
-              .map(|(sel, sigs)| {
-                  let key = hex::encode(sel);
-                  let val = sigs.iter().map(|s| s.text.clone()).collect();
-                  (key, val)
-              })
-              .collect()
-      };
+    /// Write the current cache map back to disk (atomic rename).
+    async fn persist(&self) -> Result<(), ResolveError> {
+        // Snapshot the cache with a read‑lock then serialize outside the lock.
+        let snapshot: HashMap<String, Vec<String>> = {
+            let cache = self.cache.read().await;
+            cache
+                .iter()
+                .map(|(sel, sigs)| {
+                    let key = hex::encode(sel);
+                    let val = sigs.iter().map(|s| s.text.clone()).collect();
+                    (key, val)
+                })
+                .collect()
+        };
 
-      let tmp = self.cache_file.with_extension("json.tmp");
-      let json = serde_json::to_vec_pretty(&snapshot)?;
+        let tmp = self.cache_file.with_extension("json.tmp");
+        let json = serde_json::to_vec_pretty(&snapshot)?;
 
-      // Use a blocking task for disk I/O.
-      let tmp_clone = tmp.clone();
-      let cache_file = self.cache_file.clone();
-      task::spawn_blocking(move || {
-          std::fs::write(&tmp_clone, &json)?;
-          std::fs::rename(&tmp_clone, &cache_file)?;
-          Ok::<(), std::io::Error>(())
-      })
-      .await??;
+        // Use a blocking task for disk I/O.
+        let tmp_clone = tmp.clone();
+        let cache_file = self.cache_file.clone();
+        task::spawn_blocking(move || {
+            std::fs::write(&tmp_clone, &json)?;
+            std::fs::rename(&tmp_clone, &cache_file)?;
+            Ok::<(), std::io::Error>(())
+        })
+        .await??;
 
-      Ok(())
-  }
+        Ok(())
+    }
 
-  /// Query 4byte.directory. Returns an empty vec if the selector is unknown or the
-  /// request fails.
-  async fn fetch_remote(&self, selector: Selector) -> Result<Arc<[SigInfo]>, ResolveError> {
-      let url = format!(
-          "{}/api/v1/signatures/?hex_signature=0x{}",
-          self.base_url,
-          hex::encode(selector)
-      );
+    /// Query 4byte.directory. Returns an empty vec if the selector is unknown or the
+    /// request fails.
+    async fn fetch_remote(&self, selector: Selector) -> Result<Arc<[SigInfo]>, ResolveError> {
+        let url = format!(
+            "{}/api/v1/signatures/?hex_signature=0x{}",
+            self.base_url,
+            hex::encode(selector)
+        );
 
-      let body = self
-          .client
-          .get(url)
-          .timeout(Duration::from_secs(5))
-          .send()
-          .await?
-          .error_for_status()?
-          .json::<FourByteResponse>()
-          .await?;
+        let body = self
+            .client
+            .get(url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<FourByteResponse>()
+            .await?;
 
-      // Add rate limiting delay after successful request
-      sleep(Duration::from_millis(200)).await;
+        // Add rate limiting delay after successful request
+        sleep(Duration::from_millis(200)).await;
 
-      let sigs: Vec<SigInfo> = body
-          .results
-          .into_iter()
-          .map(|e| SigInfo {
-              text: e.text_signature,
-              selector,
-          })
-          .collect();
+        let sigs: Vec<SigInfo> = body
+            .results
+            .into_iter()
+            .map(|e| SigInfo {
+                text: e.text_signature,
+                selector,
+            })
+            .collect();
 
-      Ok(Arc::from(sigs))
-  }
+        Ok(Arc::from(sigs))
+    }
 }
 
 #[async_trait]
 impl SelectorResolver for CompositeResolver {
-  async fn resolve(&self, selector: Selector) -> Result<Arc<[SigInfo]>, ResolveError> {
-      // Fast path – LRU hit
-      if let Some(hit) = self.cache.read().await.peek(&selector).cloned() {
-          return Ok(hit);
-      }
+    async fn resolve(&self, selector: Selector) -> Result<Arc<[SigInfo]>, ResolveError> {
+        // Fast path – LRU hit
+        if let Some(hit) = self.cache.read().await.peek(&selector).cloned() {
+            return Ok(hit);
+        }
 
-      // Miss → fetch
-      let sigs = self.fetch_remote(selector).await?;
+        // Miss → fetch
+        let sigs = self.fetch_remote(selector).await?;
 
-      if !sigs.is_empty() {
-          self.cache.write().await.put(selector, sigs.clone());
-          // Fire‑and‑forget persistence so we don't block the caller.
-          let slf = self.clone();
-          tokio::spawn(async move {
-              if let Err(e) = slf.persist().await {
-                  error!("persisting cache: {}", e);
-              }
-          });
-      }
+        if !sigs.is_empty() {
+            self.cache.write().await.put(selector, sigs.clone());
+            // Fire‑and‑forget persistence so we don't block the caller.
+            let slf = self.clone();
+            tokio::spawn(async move {
+                if let Err(e) = slf.persist().await {
+                    error!("persisting cache: {}", e);
+                }
+            });
+        }
 
-      Ok(sigs)
-  }
+        Ok(sigs)
+    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 use colored::*;
-use evm_lens_core::{abi, OpCode};
+use evm_lens_core::{OpCode, abi};
 use std::{collections::HashMap, sync::Arc};
 
 pub fn opcode_to_string(opcode: OpCode) -> &'static str {
@@ -195,7 +195,7 @@ pub fn categorize_opcode(opcode_str: &str) -> ColoredString {
 
 fn prioritize_signatures(signatures: &[abi::SigInfo]) -> Vec<String> {
     let mut sig_texts: Vec<String> = signatures.iter().map(|s| s.text.clone()).collect();
-    
+
     // Define priority patterns for common/standard functions
     let priority_patterns = [
         // Standard ERC20 functions
@@ -205,7 +205,6 @@ fn prioritize_signatures(signatures: &[abi::SigInfo]) -> Vec<String> {
         "transferFrom(address,address,uint256)",
         "approve(address,uint256)",
         "allowance(address,address)",
-        
         // Common contract functions
         "name()",
         "symbol()",
@@ -214,16 +213,16 @@ fn prioritize_signatures(signatures: &[abi::SigInfo]) -> Vec<String> {
         "mint(address,uint256)",
         "burn(uint256)",
     ];
-    
+
     // Sort signatures by priority
     sig_texts.sort_by(|a, b| {
         let a_priority = get_signature_priority(a, &priority_patterns);
         let b_priority = get_signature_priority(b, &priority_patterns);
-        
+
         // Lower priority number means higher importance
         a_priority.cmp(&b_priority).then_with(|| a.cmp(b))
     });
-    
+
     sig_texts
 }
 
@@ -234,25 +233,34 @@ fn get_signature_priority(sig: &str, priority_patterns: &[&str]) -> usize {
             return index;
         }
     }
-    
+
     // Penalize obvious obfuscated/random functions (low priority)
     if is_likely_obfuscated(sig) {
         return priority_patterns.len() * 2;
     }
-    
+
     // Default priority for unknown but potentially legitimate functions
     priority_patterns.len()
 }
 
 fn is_likely_obfuscated(sig: &str) -> bool {
     let function_name = sig.split('(').next().unwrap_or("");
-    
+
     // Common patterns in obfuscated function names
     let obfuscation_patterns = [
-        "_SIMON", "watch_tg_", "join_tg_", "func_", "many_msg_", "workMyDireful", "_haha_", "_invmru_",
+        "_SIMON",
+        "watch_tg_",
+        "join_tg_",
+        "func_",
+        "many_msg_",
+        "workMyDireful",
+        "_haha_",
+        "_invmru_",
     ];
-    
-    obfuscation_patterns.iter().any(|pattern| function_name.contains(pattern))
+
+    obfuscation_patterns
+        .iter()
+        .any(|pattern| function_name.contains(pattern))
 }
 
 pub fn print_opcode(
@@ -297,12 +305,12 @@ fn get_abi_comment(
 
     let mut selector = [0u8; 4];
     selector.copy_from_slice(selector_bytes);
-    
+
     if let Some(resolved) = resolved_sigs {
         if let Some(infos) = resolved.get(&selector) {
             if !infos.is_empty() {
                 let prioritized_sigs = prioritize_signatures(infos);
-                let first_sig = prioritized_sigs.get(0).unwrap_or(&String::new()).clone();
+                let first_sig = prioritized_sigs.first().unwrap_or(&String::new()).clone();
 
                 return format!("  # 0x{} → {}", hex::encode(selector), first_sig)
                     .bright_cyan()
@@ -312,4 +320,4 @@ fn get_abi_comment(
     }
 
     String::new()
-} 
+}

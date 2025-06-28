@@ -1,7 +1,4 @@
-use revm::{
-    bytecode::Bytecode,
-    primitives::Bytes,
-};
+use revm::{bytecode::Bytecode, primitives::Bytes};
 
 pub mod stats;
 pub use stats::{Stats, StatsError, compute_stats};

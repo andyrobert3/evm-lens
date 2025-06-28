@@ -227,12 +227,12 @@ async fn test_abi_flag_with_push4() {
 
     // Bytecode with PUSH4 selector for transfer(address,uint256) = 0xa9059cbb
     let bytecode_with_selector = "63a9059cbb00"; // PUSH4 0xa9059cbb, STOP
-    
+
     let mut cmd = evm_lens_cmd();
     cmd.arg(bytecode_with_selector)
         .arg("--abi")
         .env("EVM_LENS_4BYTE_URL", mock_server.uri());
-    
+
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("PUSH4"))
@@ -242,10 +242,10 @@ async fn test_abi_flag_with_push4() {
 #[test]
 fn test_abi_flag_no_selectors() {
     let simple_bytecode = "60FF00"; // PUSH1 0xFF, STOP
-    
+
     let mut cmd = evm_lens_cmd();
     cmd.arg(simple_bytecode).arg("--abi");
-    
+
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("PUSH1"))
@@ -255,10 +255,10 @@ fn test_abi_flag_no_selectors() {
 #[test]
 fn test_abi_flag_with_stats() {
     let simple_bytecode = "60FF00"; // PUSH1 0xFF, STOP
-    
+
     let mut cmd = evm_lens_cmd();
     cmd.arg(simple_bytecode).arg("--abi").arg("--stats");
-    
+
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("PUSH1"))
@@ -269,12 +269,13 @@ fn test_abi_flag_with_stats() {
 #[test]
 fn test_abi_flag_with_erc20_transfer_bytecode() {
     // Real ERC20 transfer bytecode: transfer(0x742d35Cc6634C0532925a3b8D56f3a1f0b9CF81b, 1000000000000000000)
-    // This includes PUSH4 0xa9059cbb (transfer selector) 
-    let erc20_transfer_bytecode = "63a9059cbb73742d35cc6634c0532925a3b8d56f3a1f0b9cf81b680de0b6b3a764000060405260206000f3";
-    
+    // This includes PUSH4 0xa9059cbb (transfer selector)
+    let erc20_transfer_bytecode =
+        "63a9059cbb73742d35cc6634c0532925a3b8d56f3a1f0b9cf81b680de0b6b3a764000060405260206000f3";
+
     let mut cmd = evm_lens_cmd();
     cmd.arg(erc20_transfer_bytecode).arg("--abi");
-    
+
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("PUSH4"))

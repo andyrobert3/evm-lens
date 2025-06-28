@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::*;
-use evm_lens_core::{disassemble, get_stats, Stats};
+use evm_lens_core::{Stats, disassemble, get_stats};
 use io::Source;
 
 mod abi_resolver;
@@ -139,12 +139,13 @@ async fn get_bytes_from_args(args: &Args) -> color_eyre::Result<Vec<u8>> {
 }
 
 async fn disassemble_and_display(bytes: &[u8], args: &Args) -> color_eyre::Result<()> {
-    let ops = disassemble(bytes).map_err(|e| {
-        color_eyre::eyre::eyre!("Failed to disassemble bytecode: {}", e)
-    })?;
+    let ops = disassemble(bytes)
+        .map_err(|e| color_eyre::eyre::eyre!("Failed to disassemble bytecode: {}", e))?;
 
     if ops.is_empty() {
-        return Err(color_eyre::eyre::eyre!("No opcodes found in the provided bytecode"));
+        return Err(color_eyre::eyre::eyre!(
+            "No opcodes found in the provided bytecode"
+        ));
     }
 
     let resolved_sigs = if args.abi {
@@ -193,7 +194,7 @@ async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
     let args = Args::parse();
-    
+
     let bytes = match get_bytes_from_args(&args).await {
         Ok(bytes) => bytes,
         Err(e) => {

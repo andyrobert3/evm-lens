@@ -1,4 +1,7 @@
-use evm_lens_core::{abi::{self, SelectorResolver}, OpCode};
+use evm_lens_core::{
+    OpCode,
+    abi::{self, SelectorResolver},
+};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 pub async fn resolve_selectors(
@@ -8,13 +11,13 @@ pub async fn resolve_selectors(
     let cache_dir = get_cache_directory();
     tokio::fs::create_dir_all(&cache_dir).await?;
     let cache_file = cache_dir.join("selectors.json");
-    
+
     let base_url = std::env::var("EVM_LENS_4BYTE_URL").ok();
     let resolver = abi::CompositeResolver::new(cache_file, base_url).await;
     let selectors_to_resolve = collect_push4_selectors(ops, bytes);
-    
+
     let mut resolved_map = HashMap::new();
-    
+
     // Sequential resolution with rate limiting
     for selector in selectors_to_resolve {
         match resolver.resolve(selector).await {
@@ -40,7 +43,7 @@ fn get_cache_directory() -> PathBuf {
 
 fn collect_push4_selectors(ops: &[(usize, OpCode)], bytes: &[u8]) -> Vec<abi::Selector> {
     let mut selectors = Vec::new();
-    
+
     for (position, opcode) in ops {
         if *opcode == OpCode::PUSH4 {
             if let Some(selector) = extract_selector_from_push4(*position, bytes) {
@@ -48,7 +51,7 @@ fn collect_push4_selectors(ops: &[(usize, OpCode)], bytes: &[u8]) -> Vec<abi::Se
             }
         }
     }
-    
+
     selectors
 }
 
@@ -65,4 +68,4 @@ fn extract_selector_from_push4(position: usize, bytes: &[u8]) -> Option<abi::Sel
     let mut selector = [0u8; 4];
     selector.copy_from_slice(selector_bytes);
     Some(selector)
-} 
+}
