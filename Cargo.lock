@@ -1242,6 +1242,7 @@ dependencies = [
  "colored",
  "ethereum-types",
  "evm-lens-core",
+ "futures",
  "hex",
  "predicates",
  "reqwest",
