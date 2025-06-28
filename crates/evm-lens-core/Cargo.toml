@@ -14,3 +14,17 @@ readme = "../../README.md"
 [dependencies]
 hex.workspace = true
 revm.workspace = true
+lru.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+tokio = { workspace = true, features = ["full"] }
+async-trait.workspace = true
+thiserror.workspace = true
+log.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+mockito.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true

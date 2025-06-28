@@ -1,10 +1,11 @@
-use revm::{
-    bytecode::{Bytecode, OpCode},
-    primitives::Bytes,
-};
+use revm::{bytecode::Bytecode, primitives::Bytes};
 
 pub mod stats;
 pub use stats::{Stats, StatsError, compute_stats};
+pub mod abi;
+
+// Re-export OpCode for public use
+pub use revm::bytecode::OpCode;
 
 #[derive(Debug)]
 pub enum DisassemblyError {
@@ -16,13 +17,12 @@ pub enum DisassemblyError {
 impl std::fmt::Display for DisassemblyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DisassemblyError::InvalidBytecode(msg) => write!(f, "Invalid bytecode: {}", msg),
+            DisassemblyError::InvalidBytecode(msg) => write!(f, "Invalid bytecode: {msg}"),
             DisassemblyError::EmptyBytecode => write!(f, "Bytecode is empty"),
             DisassemblyError::MalformedInstruction { position, byte } => {
                 write!(
                     f,
-                    "Malformed instruction at position {}: invalid opcode 0x{:02x}",
-                    position, byte
+                    "Malformed instruction at position {position}: invalid opcode 0x{byte:02x}"
                 )
             }
         }

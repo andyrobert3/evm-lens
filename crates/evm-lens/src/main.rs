@@ -3,7 +3,9 @@ use colored::*;
 use evm_lens_core::{Stats, disassemble, get_stats};
 use io::Source;
 
+mod abi_resolver;
 mod io;
+mod opcode;
 
 #[derive(Parser)]
 #[command(
@@ -16,6 +18,7 @@ mod io;
     evm-lens --file bytecode.txt               # From file
     evm-lens --address 0x... --rpc http://...  # From blockchain
     evm-lens 60FF61ABCD00 --stats              # Show disassembly + statistics
+    evm-lens 60FF61ABCD00 --abi                # Show disassembly + 4byte signatures
 
 For more information, visit: https://github.com/andyrobert3/evm-lens"
 )]
@@ -60,42 +63,9 @@ struct Args {
 
     #[arg(long, help = "Show bytecode statistics after disassembly")]
     stats: bool,
-}
 
-fn categorize_opcode(opcode_str: &str) -> ColoredString {
-    match opcode_str {
-        // Stack operations - Green
-        op if op.starts_with("PUSH") => op.bright_green().bold(),
-        op if op.starts_with("POP") => op.green(),
-        op if op.starts_with("DUP") => op.green(),
-        op if op.starts_with("SWAP") => op.green(),
-
-        // Arithmetic - Yellow
-        "ADD" | "SUB" | "MUL" | "DIV" | "MOD" | "ADDMOD" | "MULMOD" => {
-            opcode_str.bright_yellow().bold()
-        }
-        "LT" | "GT" | "SLT" | "SGT" | "EQ" | "ISZERO" => opcode_str.yellow(),
-
-        // Memory operations - Blue
-        "MLOAD" | "MSTORE" | "MSTORE8" | "MSIZE" | "MCOPY" => opcode_str.bright_blue().bold(),
-
-        // Storage operations - Magenta
-        "SLOAD" | "SSTORE" => opcode_str.bright_magenta().bold(),
-
-        // Crypto/Hash - Cyan
-        "KECCAK256" => opcode_str.bright_cyan().bold(),
-
-        // Control flow - Red
-        "JUMP" | "JUMPI" | "JUMPDEST" => opcode_str.bright_red().bold(),
-        "CALL" | "CALLCODE" | "DELEGATECALL" | "STATICCALL" => opcode_str.red().bold(),
-        "CREATE" | "CREATE2" => opcode_str.red(),
-
-        // End operations - White
-        "STOP" | "RETURN" | "REVERT" | "SELFDESTRUCT" => opcode_str.bright_white().bold(),
-
-        // Default - Normal
-        _ => opcode_str.normal(),
-    }
+    #[arg(long, help = "Resolve 4-byte selectors to function signatures")]
+    abi: bool,
 }
 
 fn print_header() {
@@ -109,17 +79,6 @@ fn print_footer(total_opcodes: usize) {
         "{} {}",
         total_opcodes.to_string().bright_green().bold(),
         "opcodes total".bright_black()
-    );
-}
-
-fn print_opcode(position: usize, opcode: &str) {
-    let colored_opcode = categorize_opcode(opcode);
-
-    println!(
-        "{} {} {}",
-        format!("{:04x}", position).bright_black(),
-        "│".bright_black(),
-        colored_opcode
     );
 }
 
@@ -139,6 +98,7 @@ fn print_usage_hint() {
         "evm-lens".bright_green()
     );
     eprintln!("  {} 60FF61ABCD00 --stats", "evm-lens".bright_green());
+    eprintln!("  {} 60FF61ABCD00 --abi", "evm-lens".bright_green());
     eprintln!();
     eprintln!(
         "{}",
@@ -178,6 +138,57 @@ async fn get_bytes_from_args(args: &Args) -> color_eyre::Result<Vec<u8>> {
     }
 }
 
+async fn disassemble_and_display(bytes: &[u8], args: &Args) -> color_eyre::Result<()> {
+    let ops = disassemble(bytes)
+        .map_err(|e| color_eyre::eyre::eyre!("Failed to disassemble bytecode: {}", e))?;
+
+    if ops.is_empty() {
+        return Err(color_eyre::eyre::eyre!(
+            "No opcodes found in the provided bytecode"
+        ));
+    }
+
+    let resolved_sigs = if args.abi {
+        Some(abi_resolver::resolve_selectors(&ops, bytes).await?)
+    } else {
+        None
+    };
+
+    print_header();
+    for (position, opcode) in ops.iter() {
+        opcode::print_opcode(*position, *opcode, bytes, resolved_sigs.as_ref());
+    }
+    print_footer(ops.len());
+
+    if args.stats {
+        print_stats(bytes)?;
+    }
+
+    Ok(())
+}
+
+fn print_stats(bytes: &[u8]) -> color_eyre::Result<()> {
+    match get_stats(bytes) {
+        Ok(Stats {
+            byte_len,
+            opcode_count,
+            max_stack_depth,
+        }) => {
+            println!();
+            println!("{}", "BYTECODE STATISTICS".bright_blue().bold());
+            println!("{}", "=".repeat(50).bright_black());
+            println!("Byte length: {}", byte_len);
+            println!("Number of opcodes: {}", opcode_count);
+            println!("Max stack depth: {}", max_stack_depth);
+            Ok(())
+        }
+        Err(e) => {
+            print_error(&format!("Failed to compute bytecode statistics: {}", e));
+            Err(color_eyre::eyre::eyre!("Statistics computation failed"))
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
@@ -193,52 +204,10 @@ async fn main() -> color_eyre::Result<()> {
         }
     };
 
-    let ops = match disassemble(&bytes) {
-        Ok(ops) => ops,
-        Err(e) => {
-            print_error(&format!("Failed to disassemble bytecode: {}", e));
-            eprintln!();
-            eprintln!("{}", "This could happen if:".bright_blue().bold());
-            eprintln!("  • The bytecode is malformed or incomplete");
-            eprintln!("  • The bytecode contains invalid opcodes");
-            eprintln!("  • The bytecode structure is corrupted");
-            print_usage_hint();
-            std::process::exit(1);
-        }
-    };
-
-    if ops.is_empty() {
-        print_error("No opcodes found in the provided bytecode");
+    if let Err(e) = disassemble_and_display(&bytes, &args).await {
+        print_error(&format!("{}", e));
         print_usage_hint();
         std::process::exit(1);
-    }
-
-    print_header();
-
-    for (position, opcode) in ops.iter() {
-        print_opcode(*position, opcode.as_str());
-    }
-
-    print_footer(ops.len());
-
-    if args.stats {
-        println!();
-        match get_stats(&bytes) {
-            Ok(Stats {
-                byte_len,
-                opcode_count,
-                max_stack_depth,
-            }) => {
-                println!("{}", "BYTECODE STATISTICS".bright_blue().bold());
-                println!("{}", "=".repeat(50).bright_black());
-                println!("Byte length: {}", byte_len);
-                println!("Number of opcodes: {}", opcode_count);
-                println!("Max stack depth: {}", max_stack_depth);
-            }
-            Err(e) => {
-                print_error(&format!("Failed to compute bytecode statistics: {}", e));
-            }
-        }
     }
 
     Ok(())
