@@ -1,5 +1,4 @@
 use evm_lens_core::{abi::{self, SelectorResolver}, OpCode};
-use futures::future;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 pub async fn resolve_selectors(
@@ -10,26 +9,19 @@ pub async fn resolve_selectors(
     tokio::fs::create_dir_all(&cache_dir).await?;
     let cache_file = cache_dir.join("selectors.json");
     
-    let resolver = abi::CompositeResolver::new(cache_file, None).await;
-    
+    let base_url = std::env::var("EVM_LENS_4BYTE_URL").ok();
+    let resolver = abi::CompositeResolver::new(cache_file, base_url).await;
     let selectors_to_resolve = collect_push4_selectors(ops, bytes);
     
-    let resolve_futures = selectors_to_resolve.into_iter().map(|selector| {
-        let resolver = resolver.clone();
-        async move {
-            let result = resolver.resolve(selector).await;
-            (selector, result)
-        }
-    });
-
-    let results = future::join_all(resolve_futures).await;
-
     let mut resolved_map = HashMap::new();
-    for (selector, result) in results {
-        if let Ok(infos) = result {
-            if !infos.is_empty() {
+    
+    // Sequential resolution with rate limiting
+    for selector in selectors_to_resolve {
+        match resolver.resolve(selector).await {
+            Ok(infos) if !infos.is_empty() => {
                 resolved_map.insert(selector, infos);
             }
+            _ => {} // Ignore errors and empty results
         }
     }
 
@@ -37,10 +29,12 @@ pub async fn resolve_selectors(
 }
 
 fn get_cache_directory() -> PathBuf {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join(".cache")
+    dirs::cache_dir()
+        .unwrap_or_else(|| {
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".cache")
+        })
         .join("evm-lens")
 }
 

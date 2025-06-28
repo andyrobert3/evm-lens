@@ -304,8 +304,8 @@ fn get_abi_comment(
                 let prioritized_sigs = prioritize_signatures(infos);
                 let first_sig = prioritized_sigs.get(0).unwrap_or(&String::new()).clone();
 
-                return format!("  # {}", first_sig)
-                    .bright_black()
+                return format!("  # 0x{} → {}", hex::encode(selector), first_sig)
+                    .bright_cyan()
                     .to_string();
             }
         }

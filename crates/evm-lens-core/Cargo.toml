@@ -22,6 +22,7 @@ tokio = { workspace = true, features = ["full"] }
 async-trait.workspace = true
 thiserror.workspace = true
 log.workspace = true
+dirs.workspace = true
 
 [dev-dependencies]
 mockito.workspace = true

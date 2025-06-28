@@ -5,6 +5,7 @@ use std::{
   sync::Arc,
   time::Duration,
 };
+use tokio::time::sleep;
 
 use async_trait::async_trait;
 use lru::LruCache;
@@ -166,6 +167,9 @@ impl CompositeResolver {
           .error_for_status()?
           .json::<FourByteResponse>()
           .await?;
+
+      // Add rate limiting delay after successful request
+      sleep(Duration::from_millis(200)).await;
 
       let sigs: Vec<SigInfo> = body
           .results
