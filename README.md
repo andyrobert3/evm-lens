@@ -58,6 +58,9 @@ evm-lens --address 0x123... --rpc https://eth.llamarpc.com
 
 # Show bytecode statistics
 evm-lens 60FF61ABCD00 --stats
+
+# Decode function selectors with ABI resolution
+evm-lens 63a9059cbb00 --abi
 ```
 
 **Library:**
@@ -76,6 +79,7 @@ for (position, opcode) in ops {
 **Core Capabilities:**
 - **🔍 Disassemble EVM bytecode** from multiple sources - hex strings, files, stdin, and live contract addresses
 - **📊 Generate statistics summary** including bytecode length, number of opcodes, and maximum stack depth
+- **🎯 Decode function selectors** - automatically resolve PUSH4 instructions to human-readable function signatures using 4byte.directory
 
 
 
@@ -110,6 +114,23 @@ evm-lens --address 0x123... --rpc https://mainnet.infura.io/v3/YOUR_KEY
 evm-lens --address 0x123... --rpc https://eth.llamarpc.com
 ```
 
+## 🎯 ABI Function Selector Decoding
+
+EVM Lens can automatically decode 4-byte function selectors found in PUSH4 instructions to their human-readable function signatures:
+
+```bash
+# Decode function selectors using --abi flag
+evm-lens 63a9059cbb00 --abi
+
+# Works with any input method
+evm-lens --file contract.hex --abi
+echo "0x63a9059cbb00" | evm-lens --stdin --abi
+evm-lens --address 0x123... --rpc https://eth.llamarpc.com --abi
+
+# Combine with stats for comprehensive analysis
+evm-lens 63a9059cbb00 --abi --stats
+```
+
 
 ## 📊 Example Output
 
@@ -139,6 +160,18 @@ BYTECODE STATISTICS
 Byte length: 6
 Number of opcodes: 3
 Max stack depth: 2
+```
+
+**With `--abi` flag (function selector decoding):**
+```
+EVM BYTECODE DISASSEMBLY
+==================================================
+0000 │ PUSH4  # 0xa9059cbb → transfer(address,uint256)
+0005 │ PUSH20
+001a │ PUSH9
+0024 │ BLOCKHASH
+==================================================
+4 opcodes total
 ```
 
 
@@ -171,6 +204,9 @@ cargo run -p evm-lens -- 60FF61ABCD00
 cargo run -p evm-lens -- --file examples/bytecode.txt
 echo "0x60FF61ABCD00" | cargo run -p evm-lens -- --stdin
 cargo run -p evm-lens -- --address 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 --rpc https://eth.llamarpc.com
+
+# Test ABI function selector decoding
+cargo run -p evm-lens -- 63a9059cbb00 --abi
 
 # Test the library
 cargo run --example basic -p evm-lens-core
