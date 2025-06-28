@@ -193,7 +193,7 @@ impl SelectorResolver for CompositeResolver {
             let slf = self.clone();
             tokio::spawn(async move {
                 if let Err(e) = slf.persist().await {
-                    error!("persisting cache: {}", e);
+                    error!("persisting cache: {e}");
                 }
             });
         }

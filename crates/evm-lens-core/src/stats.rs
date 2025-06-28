@@ -16,7 +16,7 @@ impl std::fmt::Display for StatsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StatsError::UnknownOpcode(opcode) => {
-                write!(f, "Unknown opcode: 0x{:02x}", opcode)
+                write!(f, "Unknown opcode: 0x{opcode:02x}")
             }
         }
     }

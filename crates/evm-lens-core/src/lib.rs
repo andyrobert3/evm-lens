@@ -17,13 +17,12 @@ pub enum DisassemblyError {
 impl std::fmt::Display for DisassemblyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DisassemblyError::InvalidBytecode(msg) => write!(f, "Invalid bytecode: {}", msg),
+            DisassemblyError::InvalidBytecode(msg) => write!(f, "Invalid bytecode: {msg}"),
             DisassemblyError::EmptyBytecode => write!(f, "Bytecode is empty"),
             DisassemblyError::MalformedInstruction { position, byte } => {
                 write!(
                     f,
-                    "Malformed instruction at position {}: invalid opcode 0x{:02x}",
-                    position, byte
+                    "Malformed instruction at position {position}: invalid opcode 0x{byte:02x}"
                 )
             }
         }
