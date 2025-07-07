@@ -4,6 +4,7 @@ use evm_lens_core::{Stats, disassemble, get_stats};
 use io::Source;
 
 mod io;
+mod tracing;
 
 #[derive(Parser)]
 #[command(
