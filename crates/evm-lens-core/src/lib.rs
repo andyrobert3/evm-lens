@@ -3,6 +3,7 @@ use revm::{bytecode::Bytecode, primitives::Bytes};
 pub mod stats;
 pub use stats::{Stats, StatsError, compute_stats};
 pub mod abi;
+pub mod storage;
 
 // Re-export OpCode for public use
 pub use revm::bytecode::OpCode;

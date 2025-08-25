@@ -23,6 +23,7 @@ async-trait.workspace = true
 thiserror.workspace = true
 log.workspace = true
 dirs.workspace = true
+color-eyre.workspace = true
 
 [dev-dependencies]
 mockito.workspace = true
