@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::Path;
 
 use color_eyre::Result;
-use evm_lens_core::storage::{DiffEntry, SeverityGrade, Summary, Provenance, StorageType};
+use evm_lens_core::storage::{DiffEntry, Provenance, SeverityGrade, StorageType, Summary};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -31,8 +31,22 @@ pub fn write_html_report(path: &Path, diffs: &[DiffEntry], summary: &Summary) ->
     )?;
     writeln!(f, "</head><body>")?;
     writeln!(f, "<h2>Storage Diff</h2>")?;
-    let max_grade_class = match summary.max_grade { SeverityGrade::Ok => "ok", SeverityGrade::Risk => "risk", SeverityGrade::Break => "break" };
-    writeln!(f, "<p>Added: {} &nbsp; Removed: {} &nbsp; TypeChanged: {} &nbsp; PackingChanged: {} &nbsp; Same: {} &nbsp; Max grade: <span class=\"chip {}\">{:?}</span></p>", summary.added, summary.removed, summary.type_changed, summary.packing_changed, summary.same, max_grade_class, summary.max_grade)?;
+    let max_grade_class = match summary.max_grade {
+        SeverityGrade::Ok => "ok",
+        SeverityGrade::Risk => "risk",
+        SeverityGrade::Break => "break",
+    };
+    writeln!(
+        f,
+        "<p>Added: {} &nbsp; Removed: {} &nbsp; TypeChanged: {} &nbsp; PackingChanged: {} &nbsp; Same: {} &nbsp; Max grade: <span class=\"chip {}\">{:?}</span></p>",
+        summary.added,
+        summary.removed,
+        summary.type_changed,
+        summary.packing_changed,
+        summary.same,
+        max_grade_class,
+        summary.max_grade
+    )?;
 
     writeln!(f, "<table>")?;
     writeln!(
@@ -46,21 +60,39 @@ pub fn write_html_report(path: &Path, diffs: &[DiffEntry], summary: &Summary) ->
             SeverityGrade::Break => "break",
         };
         let (old_desc, old_unknown) = match d.old.as_ref() {
-            Some(e) => (format!("{:?}", e.r#type), matches!(e.r#type, StorageType::Unknown)),
+            Some(e) => (
+                format!("{:?}", e.r#type),
+                matches!(e.r#type, StorageType::Unknown),
+            ),
             None => ("—".to_string(), false),
         };
         let (new_desc, new_unknown) = match d.new.as_ref() {
-            Some(e) => (format!("{:?}", e.r#type), matches!(e.r#type, StorageType::Unknown)),
+            Some(e) => (
+                format!("{:?}", e.r#type),
+                matches!(e.r#type, StorageType::Unknown),
+            ),
             None => ("—".to_string(), false),
         };
         let tip = "No compiler metadata available; conservative heuristic left type unknown.";
-        let old_html = if old_unknown { format!("<span title=\"{}\">{}</span>", tip, old_desc) } else { old_desc };
-        let new_html = if new_unknown { format!("<span title=\"{}\">{}</span>", tip, new_desc) } else { new_desc };
+        let old_html = if old_unknown {
+            format!("<span title=\"{}\">{}</span>", tip, old_desc)
+        } else {
+            old_desc
+        };
+        let new_html = if new_unknown {
+            format!("<span title=\"{}\">{}</span>", tip, new_desc)
+        } else {
+            new_desc
+        };
 
         let badge = |p: Option<Provenance>| -> String {
             match p {
-                Some(Provenance::CompilerMetadata) => "<span class=\"badge meta\">Metadata</span>".to_string(),
-                Some(Provenance::HeuristicTrace) => "<span class=\"badge heur\">Heuristic</span>".to_string(),
+                Some(Provenance::CompilerMetadata) => {
+                    "<span class=\"badge meta\">Metadata</span>".to_string()
+                }
+                Some(Provenance::HeuristicTrace) => {
+                    "<span class=\"badge heur\">Heuristic</span>".to_string()
+                }
                 None => "—".to_string(),
             }
         };
