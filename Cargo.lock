@@ -1282,6 +1282,7 @@ name = "evm-lens-core"
 version = "0.2.0"
 dependencies = [
  "async-trait",
+ "color-eyre",
  "dirs",
  "hex",
  "log",

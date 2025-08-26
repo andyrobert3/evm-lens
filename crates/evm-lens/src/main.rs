@@ -1,17 +1,23 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use colored::*;
+use evm_lens_core::storage::{
+    CompositeResolver, SeverityGrade, diff_layouts,
+    resolvers::{heuristic::HeuristicResolver, metadata::MetadataResolver},
+};
 use evm_lens_core::{Stats, disassemble, get_stats};
 use io::Source;
+use std::path::PathBuf;
 
 mod abi_resolver;
 mod io;
 mod opcode;
+mod report;
 
 #[derive(Parser)]
 #[command(
     name = "evm-lens",
     version,
-    about = "A colorful EVM bytecode disassembler",
+    about = "A colorful EVM bytecode disassembler and storage diff tool",
     after_help = "EXAMPLES:
     evm-lens 60FF                              # Simple PUSH1 instruction from arg
     echo '0x60FF61ABCD00' | evm-lens --stdin   # From stdin
@@ -19,10 +25,13 @@ mod opcode;
     evm-lens --address 0x... --rpc http://...  # From blockchain
     evm-lens 60FF61ABCD00 --stats              # Show disassembly + statistics
     evm-lens 60FF61ABCD00 --abi                # Show disassembly + 4byte signatures
+    evm-lens storage-diff <old.hex> <new.hex> [--json out.json] [--html out.html] [--ci]
 
 For more information, visit: https://github.com/andyrobert3/evm-lens"
 )]
 struct Args {
+    #[command(subcommand)]
+    command: Option<Command>,
     #[arg(
         help = "Hexadecimal EVM bytecode to disassemble (if no other source specified)",
         value_name = "BYTECODE",
@@ -66,6 +75,29 @@ struct Args {
 
     #[arg(long, help = "Resolve 4-byte selectors to function signatures")]
     abi: bool,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Compare two files (hex contents) and report storage layout diffs
+    StorageDiff(StorageDiffArgs),
+}
+
+#[derive(clap::Args)]
+struct StorageDiffArgs {
+    /// Old artifact file path containing hex-encoded runtime bytecode
+    old: PathBuf,
+    /// New artifact file path containing hex-encoded runtime bytecode
+    new: PathBuf,
+    /// Output JSON file path
+    #[arg(long, value_name = "FILE")]
+    json: Option<PathBuf>,
+    /// Output HTML file path
+    #[arg(long, value_name = "FILE")]
+    html: Option<PathBuf>,
+    /// CI mode: exit non-zero on Risk/Break
+    #[arg(long)]
+    ci: bool,
 }
 
 fn print_header() {
@@ -195,6 +227,14 @@ async fn main() -> color_eyre::Result<()> {
 
     let args = Args::parse();
 
+    if let Some(Command::StorageDiff(sd)) = &args.command {
+        if let Err(e) = run_storage_diff(sd).await {
+            print_error(&format!("{}", e));
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+
     let bytes = match get_bytes_from_args(&args).await {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -211,4 +251,67 @@ async fn main() -> color_eyre::Result<()> {
     }
 
     Ok(())
+}
+
+async fn run_storage_diff(sd: &StorageDiffArgs) -> color_eyre::Result<()> {
+    let old_bytes = load_bytes_from_file(&sd.old).await?;
+    let new_bytes = load_bytes_from_file(&sd.new).await?;
+
+    let resolver = CompositeResolver::new(vec![
+        Box::new(MetadataResolver),
+        Box::new(HeuristicResolver),
+    ]);
+
+    let old_layout = resolver.resolve(&old_bytes).await?;
+    let new_layout = resolver.resolve(&new_bytes).await?;
+
+    let (diffs, summary) = diff_layouts(&old_layout, &new_layout);
+
+    // CLI summary line
+    println!(
+        "{} {}={} {}={} {}={} {}={} {}={} {}={}",
+        "storage-diff:".bright_blue().bold(),
+        "added".bright_green(),
+        summary.added,
+        "removed".bright_red(),
+        summary.removed,
+        "type_changed".bright_red(),
+        summary.type_changed,
+        "packing_changed".bright_yellow(),
+        summary.packing_changed,
+        "same".bright_black(),
+        summary.same,
+        "max_grade".bright_white(),
+        format!("{:?}", summary.max_grade)
+    );
+
+    if let Some(path) = &sd.json {
+        report::write_json_report(path, &diffs, &summary)?;
+        println!("{} {}", "wrote".bright_black(), path.display());
+    }
+    if let Some(path) = &sd.html {
+        report::write_html_report(path, &diffs, &summary)?;
+        println!("{} {}", "wrote".bright_black(), path.display());
+    }
+
+    if sd.ci {
+        if summary.max_grade >= SeverityGrade::Risk {
+            std::process::exit(2);
+        }
+    }
+
+    Ok(())
+}
+
+async fn load_bytes_from_file(path: &PathBuf) -> color_eyre::Result<Vec<u8>> {
+    use std::fs;
+    if !path.exists() || !path.is_file() {
+        return Err(color_eyre::eyre::eyre!(
+            "File not found or not a file: {}",
+            path.display()
+        ));
+    }
+    let content = fs::read_to_string(path)
+        .map_err(|e| color_eyre::eyre::eyre!("Failed to read file {}: {}", path.display(), e))?;
+    io::decode_hex(content.trim())
 }
