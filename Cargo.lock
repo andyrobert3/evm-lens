@@ -1255,7 +1255,7 @@ dependencies = [
 
 [[package]]
 name = "evm-lens"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -1279,7 +1279,7 @@ dependencies = [
 
 [[package]]
 name = "evm-lens-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "color-eyre",
