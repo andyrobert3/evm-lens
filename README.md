@@ -61,6 +61,11 @@ evm-lens 60FF61ABCD00 --stats
 
 # Decode function selectors with ABI resolution
 evm-lens 63a9059cbb00 --abi
+
+# Compare storage layouts (files only)
+evm-lens storage-diff artifacts/old.hex artifacts/new.hex
+evm-lens storage-diff old.hex new.hex --json target/storage.json --html target/storage.html
+evm-lens storage-diff old.hex new.hex --ci
 ```
 
 **Library:**
@@ -80,6 +85,7 @@ for (position, opcode) in ops {
 - **🔍 Disassemble EVM bytecode** from multiple sources - hex strings, files, stdin, and live contract addresses
 - **📊 Generate statistics summary** including bytecode length, number of opcodes, and maximum stack depth
 - **🎯 Decode function selectors** - automatically resolve PUSH4 instructions to human-readable function signatures using 4byte.directory
+- **🧮 Storage diff** - compare two artifacts and flag storage layout changes with JSON/HTML reports and CI-friendly exit codes
 
 
 
@@ -129,6 +135,41 @@ evm-lens --address 0x123... --rpc https://eth.llamarpc.com --abi
 
 # Combine with stats for comprehensive analysis
 evm-lens 63a9059cbb00 --abi --stats
+```
+
+
+## 🧮 Storage Diff
+
+Compare two compiled artifacts (files containing hex-encoded runtime bytecode) and flag storage layout risks.
+
+```bash
+evm-lens storage-diff <old.hex> <new.hex> [--json out.json] [--html out.html] [--ci]
+```
+
+- Inputs:
+  - `<old.hex>`, `<new.hex>`: file paths containing hex-encoded runtime bytecode (with or without 0x).
+- How it works:
+  - Builds a StorageLayout for each input using a composite resolver:
+    1) Compiler metadata (if available), 2) conservative bytecode heuristic (PUSH… then SLOAD/SSTORE).
+  - Computes a per-slot diff with statuses: `Same | Added | Removed | TypeChanged | PackingChanged`.
+  - Assigns grades: `Ok | Risk | Break` (Added=Ok, Removed/TypeChanged=Break, PackingChanged=Risk).
+  - Records provenance per side: `CompilerMetadata` or `HeuristicTrace`.
+- Outputs:
+  - CLI one-line summary with counts and max grade.
+  - Optional JSON (`--json`) and HTML (`--html`) reports.
+- CI:
+  - With `--ci`, exits non‑zero (code 2) if `max_grade >= Risk`.
+
+Examples:
+```bash
+# Basic compare
+evm-lens storage-diff artifacts/old.hex artifacts/new.hex
+
+# Write JSON/HTML reports
+evm-lens storage-diff old.hex new.hex --json target/storage.json --html target/storage.html
+
+# CI policy (non-zero on Risk/Break)
+evm-lens storage-diff old.hex new.hex --ci
 ```
 
 
