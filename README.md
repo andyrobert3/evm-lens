@@ -37,7 +37,7 @@ cargo install evm-lens
 
 ```toml
 [dependencies]
-evm-lens-core = "2.0.0"
+evm-lens-core = "3.0.0"
 ```
 
 ### Example Usage
